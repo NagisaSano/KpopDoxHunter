@@ -1,77 +1,167 @@
 import os
-import requests, re, pandas as pd, numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+import time
 from datetime import datetime
 
-API_KEY = os.getenv("YOUTUBE_API_KEY", "DEMO_KEY_CHANGE_ME")
-QUERIES = ["Hamedaxmj Felix", "Felix Séoul", "Stray Kids maison", "Felix Corée address"]
+import pandas as pd
+import requests
+from requests.exceptions import RequestException
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
-DOX_CORPUS = [
-    "Felix maison Séoul transports 25 minutes", "Hamedaxmj devant chez Felix Stray Kids",
-    "adresse Felix quartier Corée du Sud", "Felix lives here Seoul house passants"
+API_KEY = os.getenv("YOUTUBE_API_KEY")
+REQUEST_TIMEOUT = 10
+MIN_DOX_SCORE = 0.15
+RETRY_ATTEMPTS = 3
+RETRY_BACKOFF_SECONDS = 1.5
+
+QUERIES = [
+    "Hamedaxmj Felix",
+    "Felix Seoul",
+    "Stray Kids maison",
+    "Felix Coree address",
 ]
 
+DOX_CORPUS = [
+    "Felix maison Seoul transports 25 minutes",
+    "Hamedaxmj devant chez Felix Stray Kids",
+    "adresse Felix quartier Coree du Sud",
+    "Felix lives here Seoul house passants",
+]
+
+FRENCH_STOP_WORDS = {
+    "le",
+    "la",
+    "les",
+    "un",
+    "une",
+    "des",
+    "et",
+    "ou",
+    "de",
+    "du",
+    "en",
+    "dans",
+    "au",
+    "aux",
+    "pour",
+    "avec",
+    "sur",
+    "chez",
+}
+STOP_WORDS = ENGLISH_STOP_WORDS.union(FRENCH_STOP_WORDS)
+STOP_WORDS = sorted(STOP_WORDS)
+
+
+def require_api_key() -> None:
+    """Stop execution early when the API key is missing or placeholder."""
+    if not API_KEY or API_KEY == "DEMO_KEY_CHANGE_ME":
+        raise SystemExit(
+            "[KpopDoxHunter] Missing YouTube API key. "
+            "Set YOUTUBE_API_KEY before running the scanner."
+        )
+
+
 def ml_dox_hunter():
-    vectorizer = TfidfVectorizer(stop_words='english')
+    require_api_key()
+
+    vectorizer = TfidfVectorizer(stop_words=STOP_WORDS, strip_accents="unicode")
     X_train = vectorizer.fit_transform(DOX_CORPUS)
 
     results = []
+    request_failures = 0
+    successful_fetch = False
     for query in QUERIES:
         url = "https://www.googleapis.com/youtube/v3/search"
         params = {
-            'part': 'snippet',
-            'q': query,
-            'type': 'video',
-            'key': API_KEY,
-            'maxResults': 15
+            "part": "snippet",
+            "q": query,
+            "type": "video",
+            "key": API_KEY,
+            "maxResults": 15,
         }
 
-        resp = requests.get(url, params=params)
-        try:
-            data = resp.json()
-        except Exception:
-            print(f"[ERROR] Invalid JSON for query '{query}' (status={resp.status_code})")
+        data = None
+        for attempt in range(1, RETRY_ATTEMPTS + 1):
+            try:
+                resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+                resp.raise_for_status()
+                data = resp.json()
+                break
+            except RequestException as exc:
+                request_failures += 1
+                print(
+                    f"[WARN] Request failed for query '{query}' "
+                    f"(attempt {attempt}/{RETRY_ATTEMPTS}): {exc}"
+                )
+                if attempt < RETRY_ATTEMPTS:
+                    time.sleep(RETRY_BACKOFF_SECONDS * attempt)
+            except ValueError:
+                request_failures += 1
+                print(
+                    f"[ERROR] Invalid JSON for query '{query}' "
+                    f"(status={resp.status_code})"
+                )
+                break
+
+        if data is None:
             continue
 
-        if 'items' not in data:
-            print(f"[WARN] No 'items' in response for query '{query}' (status={resp.status_code}, error={data.get('error')})")
+        if "items" not in data:
+            print(
+                f"[WARN] No 'items' in response for query '{query}' "
+                f"(status={resp.status_code}, error={data.get('error')})"
+            )
             continue
 
-        for video in data['items']:
-            text = (video['snippet']['title'] + ' ' + video['snippet']['description']).lower()
+        if not data["items"]:
+            continue
+        successful_fetch = True
+
+        for video in data["items"]:
+            text = (
+                video["snippet"]["title"] + " " + video["snippet"]["description"]
+            ).lower()
             vec = vectorizer.transform([text])
             dox_score = cosine_similarity(X_train, vec).max()
-            results.append({
-                'query': query,
-                'title': video['snippet']['title'][:100],
-                'video_id': video['id']['videoId'],
-                'dox_score': dox_score,
-                'timestamp': datetime.now()
-            })
+            results.append(
+                {
+                    "query": query,
+                    "title": video["snippet"]["title"][:100],
+                    "video_id": video["id"]["videoId"],
+                    "dox_score": dox_score,
+                    "timestamp": datetime.now(),
+                }
+            )
 
     df = pd.DataFrame(results)
     if df.empty:
-        print("[KpopDoxHunter] No results collected (check your YouTube API key or quota).")
-        return df  # DataFrame vide avec 0 ligne mais colonnes automatiques
+        if not successful_fetch and request_failures:
+            raise SystemExit(
+                "[KpopDoxHunter] All requests failed; no report generated."
+            )
+        print("[KpopDoxHunter] No results collected (check API key, quota, or queries).")
+        return df
 
-    if 'dox_score' not in df.columns:
+    if "dox_score" not in df.columns:
         print("[KpopDoxHunter] No 'dox_score' column in results, skipping ML filter.")
         return df
 
-    df = df[df['dox_score'] > 0.1].sort_values('dox_score', ascending=False)
+    df = df[df["dox_score"] >= MIN_DOX_SCORE].sort_values("dox_score", ascending=False)
+    if df.empty:
+        print(f"[KpopDoxHunter] No videos above the dox_score threshold ({MIN_DOX_SCORE}).")
+        return df
+
     print(f"[KpopDoxHunter] Found {len(df)} suspicious videos.")
 
-    # Ensure "reports" directory exists
     os.makedirs("reports", exist_ok=True)
-
     filename = f"dox_report_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
     filepath = os.path.join("reports", filename)
 
     df.to_csv(filepath, index=False)
-    print(f"🌋 V8 ML SCAN: {len(df)} hits → {filepath}")
-    print(df[['title', 'dox_score']].head())
+    print(f"[KpopDoxHunter] ML scan saved {len(df)} hits to {filepath}")
+    print(df[["title", "dox_score"]].head())
     return df
+
 
 if __name__ == "__main__":
     hits = ml_dox_hunter()
