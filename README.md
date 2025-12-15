@@ -8,6 +8,14 @@ The goal is to show:
 
 ---
 
+## 📊 Dashboard Preview
+
+![Dashboard showing suspicious videos](docs/dashboard_screenshot.png)
+
+*Live Flask dashboard displaying videos sorted by doxxing risk score*
+
+---
+
 ## Features
 
 - Runs predefined YouTube searches (French/English) around Felix (Stray Kids) and doxxing-style phrasing.
