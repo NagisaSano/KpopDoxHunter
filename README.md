@@ -33,6 +33,14 @@ run_all.bat # on Windows
 
 Then open `http://127.0.0.1:5000` in your browser.
 
+Set your YouTube API key before running:
+
+Windows (PowerShell):
+  $env:YOUTUBE_API_KEY="YOUR_KEY_HERE"
+
+Linux/macOS:
+  export YOUTUBE_API_KEY="YOUR_KEY_HERE"
+
 ## Project goal
 Detect and score potential doxxing/stalking content targeting K-pop idols (starting with Felix) across YouTube search results.
 

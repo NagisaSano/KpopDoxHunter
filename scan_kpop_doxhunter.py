@@ -4,7 +4,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from datetime import datetime
 
-API_KEY = "..."  # Ta clé
+API_KEY = os.getenv("YOUTUBE_API_KEY", "DEMO_KEY_CHANGE_ME")
 QUERIES = ["Hamedaxmj Felix", "Felix Séoul", "Stray Kids maison", "Felix Corée address"]
 
 DOX_CORPUS = [
@@ -19,9 +19,26 @@ def ml_dox_hunter():
     results = []
     for query in QUERIES:
         url = "https://www.googleapis.com/youtube/v3/search"
-        params = {'part': 'snippet', 'q': query, 'type': 'video', 'key': API_KEY, 'maxResults': 15}
-        resp = requests.get(url, params=params).json()
-        for video in resp['items']:
+        params = {
+            'part': 'snippet',
+            'q': query,
+            'type': 'video',
+            'key': API_KEY,
+            'maxResults': 15
+        }
+
+        resp = requests.get(url, params=params)
+        try:
+            data = resp.json()
+        except Exception:
+            print(f"[ERROR] Invalid JSON for query '{query}' (status={resp.status_code})")
+            continue
+
+        if 'items' not in data:
+            print(f"[WARN] No 'items' in response for query '{query}' (status={resp.status_code}, error={data.get('error')})")
+            continue
+
+        for video in data['items']:
             text = (video['snippet']['title'] + ' ' + video['snippet']['description']).lower()
             vec = vectorizer.transform([text])
             dox_score = cosine_similarity(X_train, vec).max()
@@ -34,7 +51,16 @@ def ml_dox_hunter():
             })
 
     df = pd.DataFrame(results)
+    if df.empty:
+        print("[KpopDoxHunter] No results collected (check your YouTube API key or quota).")
+        return df  # DataFrame vide avec 0 ligne mais colonnes automatiques
+
+    if 'dox_score' not in df.columns:
+        print("[KpopDoxHunter] No 'dox_score' column in results, skipping ML filter.")
+        return df
+
     df = df[df['dox_score'] > 0.1].sort_values('dox_score', ascending=False)
+    print(f"[KpopDoxHunter] Found {len(df)} suspicious videos.")
 
     # Ensure "reports" directory exists
     os.makedirs("reports", exist_ok=True)
