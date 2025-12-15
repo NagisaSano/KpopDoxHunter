@@ -9,7 +9,18 @@ KpopDoxHunter is a small anti‑doxxing experiment for K‑pop idols. It queries
 
 The goal is not to be perfect, but to demonstrate:
 - How to combine a public API (YouTube Data API) with a simple NLP pipeline.
-- How to build a tiny “monitoring” dashboard around it using Flask and pandas. 
+- How to build a tiny “monitoring” dashboard around it using Flask and pandas.
+
+---
+
+## Why this project?
+
+This tool was built after discovering a YouTube video that inadvertently exposed the presumed address of a K-pop idol. Instead of amplifying the issue, I created an automated scanner to:
+- **Detect similar content** before it spreads widely
+- **Demonstrate ethical use** of cybersecurity and ML skills
+- **Provide a portfolio piece** showcasing API integration, NLP, and web development
+
+This is an educational project exploring automated content monitoring for privacy protection.
 
 ---
 
