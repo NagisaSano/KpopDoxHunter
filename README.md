@@ -24,6 +24,14 @@ This is an educational project exploring automated content monitoring for privac
 
 ---
 
+## 📊 Dashboard Preview
+
+![Dashboard showing suspicious videos](docs/dashboard_screenshot.png)
+
+*Live Flask dashboard displaying videos sorted by doxxing risk score*
+
+---
+
 ## Features
 
 - Runs 4 predefined YouTube searches in French/English around Felix (Stray Kids) and doxxing‑style phrases. 
