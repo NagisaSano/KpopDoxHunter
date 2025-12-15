@@ -18,7 +18,7 @@ I will respond within 48 hours and work on a fix as quickly as possible.
 This is an educational project. Known limitations:
 - Uses YouTube Data API (subject to quota limits and ToS)
 - TF-IDF model is intentionally simple and not production-grade
-- Flask runs in debug mode (not suitable for public deployment)
+- Flask default server is for development only; deploy behind a proper WSGI server if exposed
 
 ## Responsible Use
 
