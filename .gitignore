@@ -1,1 +1,24 @@
-reports/*.csv
+# API keys & secrets
+.env
+*.key
+config.ini
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Reports (optionnel : décommente si tu veux garder privés)
+# reports/*.csv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
