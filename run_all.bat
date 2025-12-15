@@ -6,7 +6,7 @@ REM call .venv\Scripts\activate.bat
 
 REM 2) Run ML scan
 echo [KpopDoxHunter] Running ML scan...
-python proto.py
+python scan_kpop_doxhunter.py
 
 REM 3) Start Flask dashboard
 echo [KpopDoxHunter] Starting Flask dashboard...
