@@ -11,8 +11,8 @@ __pycache__/
 venv/
 env/
 
-# Reports (optionnel : décommente si tu veux garder privés)
-# reports/*.csv
+# Reports
+reports/*.csv
 
 # IDE
 .vscode/
