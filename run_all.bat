@@ -1,8 +1,8 @@
 @echo off
 REM Run KpopDoxHunter scan + dashboard
 
-REM 1) Activate virtualenv (adapt path if needed)
-call .venv\Scripts\activate.bat
+REM 1) Activate virtualenv (optional)
+REM call .venv\Scripts\activate.bat
 
 REM 2) Run ML scan
 echo [KpopDoxHunter] Running ML scan...
