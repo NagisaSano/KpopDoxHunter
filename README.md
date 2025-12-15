@@ -1,5 +1,10 @@
 # KpopDoxHunter
 
+![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white)
+![License](https://img.shields.io/github/license/NagisaSano/KpopDoxHunter)
+![Last Commit](https://img.shields.io/github/last-commit/NagisaSano/KpopDoxHunter)
+![Stars](https://img.shields.io/github/stars/NagisaSano/KpopDoxHunter?style=social)
+
 KpopDoxHunter is a small anti‑doxxing experiment for K‑pop idols. It queries the YouTube API with suspicious search phrases and uses a lightweight ML filter (TF‑IDF + cosine similarity) to flag videos that look like they contain potential doxxing content (addresses, home descriptions, etc.). 
 
 The goal is not to be perfect, but to demonstrate:
