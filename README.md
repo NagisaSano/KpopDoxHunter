@@ -1,21 +1,38 @@
-# 🛡️ KpopDoxHunter - ML Anti-Sasaeng Scanner
+# 🛡️ KpopDoxHunter
+**Anti-sasaeng scanner for K-pop idols** (Felix / Stray Kids use case)
 
-**Protège idols K-pop vs doxxing** (Felix StrayKids use case)
+## Live Demo (v2.0 – ML)
+Example scan output:
+- `2025-12-15 22:50` → `dox_report_20251215_2250.csv` (50 hits)
+- `2025-12-15 23:12` → `dox_report_20251215_2312.csv` (60 hits) [file:e25282f5-aefa-47f7-a6cb-a4b1e48c1a6e]
 
-## 🚀 Live Demo V2.0
-[2025-12-15 22:50] ML SCAN: 50 hits → dox_report_20251215_2250.csv
-Hamedaxmj Felix Corée: 0.72 score (🚨 HIGH RISK)
+Top scores (YouTube):
+- `Je FUGUE SEUL en CORÉE DU SUD ... #1` → `dox_score ≈ 0.72`
+- `JE TESTE LE PLUS GRAND PARC D'ATTRACTION DE COREE DU SUD` → `dox_score ≈ 0.69` [file:792220a8-e4f2-4577-861c-fbba0cb58109]
 
-## Tech Stack Senior
-- **YouTube Data API v3** (10k/jour)
-- **scikit-learn TF-IDF + Cosine Similarity** (ML dox scoring)
-- **Pandas** CSV exports timestamped
-- **4 queries multi-angle** (Hamedaxmj, Felix Séoul, Stray Kids maison)
+## Tech Stack
+- Python 3 + `requests`, `pandas`, `scikit-learn`
+- YouTube Data API v3 (search)
+- TF-IDF + cosine similarity for doxxing score
+- Flask dashboard (HTML table of latest CSV report)
 
-## Results V2.0
-| Query | Top Hit | ML Score |
-|-------|---------|----------|
-| Hamedaxmj Felix | "Je FUGUE SEUL en CORÉE..." | **0.724** 🚨 |
-| Stray Kids maison | "[SKZ LOG] Stray Kids..." | **0.615** ⚠️ |
+## How to run
 
-**Next**: Telegram alerts + GitHub Actions 24/7
+1. Clone the repo:
+git clone https://github.com/NagisaSano/KpopDoxHunter.git
+cd KpopDoxHunter
+
+2. Install dependencies:
+pip install -r requirements.txt # (or manually: requests, pandas, scikit-learn, flask)
+
+3. Set your YouTube API key in `proto.py`:
+API_KEY = "YOUR_API_KEY_HERE"
+
+4. Run scan + dashboard:
+run_all.bat # on Windows
+
+Then open `http://127.0.0.1:5000` in your browser.
+
+## Project goal
+Detect and score potential doxxing/stalking content targeting K-pop idols (starting with Felix) across YouTube search results.
+
