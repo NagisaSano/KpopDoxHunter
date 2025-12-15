@@ -1,8 +1,47 @@
-<!DOCTYPE html>
-<html>
-<head><title>KpopDoxHunter Dashboard</title></head>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>KpopDoxHunter – Dashboard</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem; }
+    th { background: #111; color: #fff; text-align: left; }
+    tr:nth-child(even) { background: #f7f7f7; }
+    .score { text-align: right; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
 <body>
-<h1>🛡️ KpopDoxHunter LIVE</h1>
-<p>Latest scan: {{ data|safe }}</p>
+  <h1>KpopDoxHunter – Suspicious videos</h1>
+
+  {% if not rows %}
+    <p>No report found. Run the scanner first.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Score</th>
+          {% if 'youtube_url' in columns %}
+            <th>Link</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <td>{{ row.title }}</td>
+            <td class="score">{{ row.dox_score_fmt }}</td>
+            {% if 'youtube_url' in columns and row.youtube_url %}
+              <td><a href="{{ row.youtube_url }}" target="_blank">Open</a></td>
+            {% elif 'youtube_url' in columns %}
+              <td>-</td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
 </body>
 </html>
