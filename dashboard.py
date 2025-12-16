@@ -22,6 +22,12 @@ def get_latest_report():
         if f.name not in seen_names:
             unique_files.append(f)
             seen_names.add(f.name)
+        else:
+            try:
+                f.unlink()
+                print(f"[INFO] Removed duplicate report '{f.name}'")
+            except OSError as exc:
+                print(f"[WARN] Failed to remove duplicate '{f}': {exc}")
     csv_files = unique_files
 
     latest = csv_files[-1]
