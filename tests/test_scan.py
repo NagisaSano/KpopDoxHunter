@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import scan_kpop_doxhunter as scan
 from requests.exceptions import RequestException
 
@@ -60,6 +61,42 @@ class ScanKpopDoxhunterTests(unittest.TestCase):
 
         with self.assertRaises(SystemExit):
             scan.ml_dox_hunter()
+
+    def _quota_response(self, status_code=403):
+        mock_resp = MagicMock()
+        mock_resp.status_code = status_code
+        mock_resp.raise_for_status.side_effect = RequestException(response=mock_resp)
+        return mock_resp
+
+    @patch("scan_kpop_doxhunter.requests.get")
+    def test_ml_dox_hunter_saves_partial_then_exits_on_quota(self, mock_get):
+        # First query succeeds, second hits quota and stops after saving partial results
+        success = self._mock_response()
+        quota = self._quota_response(403)
+        mock_get.side_effect = [success, quota]
+        scan.QUERIES = ["felix maison test", "felix quota test"]
+
+        before = {p.name for p in Path("reports").glob("dox_report_*.csv")}
+        with self.assertRaises(SystemExit):
+            scan.ml_dox_hunter()
+
+        after = {p.name for p in Path("reports").glob("dox_report_*.csv")}
+        new_files = list(after - before)
+        self.assertTrue(new_files, "No report saved before quota exit")
+        latest = Path("reports", sorted(new_files)[-1])
+        df_saved = pd.read_csv(latest)
+        self.assertFalse(df_saved.empty)
+        self.assertIn("dox_score", df_saved.columns)
+
+    @patch("scan_kpop_doxhunter.requests.get")
+    def test_ml_dox_hunter_ignores_non_dict_json(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = ["not-a-dict"]
+        mock_get.return_value = mock_resp
+        df = scan.ml_dox_hunter()
+        self.assertTrue(df.empty)
 
 
 if __name__ == "__main__":

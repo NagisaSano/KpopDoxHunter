@@ -121,7 +121,7 @@ def ml_dox_hunter():
 
         if quota_blocked:
             break
-        if data is None:
+        if data is None or not isinstance(data, dict):
             continue
 
         if "items" not in data:
@@ -157,11 +157,6 @@ def ml_dox_hunter():
             )
 
     df = pd.DataFrame(results)
-    if quota_blocked:
-        raise SystemExit(
-            "[KpopDoxHunter] Quota or forbidden responses detected; aborting."
-        )
-
     if df.empty:
         if not successful_fetch and request_failures:
             raise SystemExit("[KpopDoxHunter] All requests failed; no report generated.")
@@ -186,6 +181,10 @@ def ml_dox_hunter():
     df.to_csv(filepath, index=False)
     print(f"[KpopDoxHunter] ML scan saved {len(df)} hits to {filepath}")
     print(df[["title", "dox_score"]].head())
+    if quota_blocked:
+        raise SystemExit(
+            "[KpopDoxHunter] Quota or forbidden responses detected; partial results saved."
+        )
     return df
 
 
