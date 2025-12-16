@@ -17,6 +17,7 @@ REQUEST_TIMEOUT = 10
 MIN_DOX_SCORE = 0.25  # Raised threshold to reduce false positives
 RETRY_ATTEMPTS = 3
 RETRY_BACKOFF_SECONDS = 1.5
+MAX_PAGES_PER_QUERY = 2  # Pagination cap to reduce quota usage
 
 QUERIES = [
     "Felix maison Seoul",
@@ -198,109 +199,126 @@ def ml_dox_hunter():
     request_failures = 0
     successful_fetch = False
     quota_blocked = False
+    seen_ids = set()
 
     for query in QUERIES:
         url = "https://www.googleapis.com/youtube/v3/search"
-        params = {
-            "part": "snippet",
-            "q": query,
-            "type": "video",
-            "key": api_key,
-            "maxResults": 15,
-        }
+        page_token = None
+        pages_fetched = 0
 
-        data = None
-        for attempt in range(1, RETRY_ATTEMPTS + 1):
-            try:
-                resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
-                status = resp.status_code
+        while True:
+            params = {
+                "part": "snippet",
+                "q": query,
+                "type": "video",
+                "key": api_key,
+                "maxResults": 15,
+            }
+            if page_token:
+                params["pageToken"] = page_token
 
-                if status in (403, 429):
-                    quota_blocked = True
+            data = None
+            for attempt in range(1, RETRY_ATTEMPTS + 1):
+                try:
+                    resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+                    status = resp.status_code
+
+                    if status in (403, 429):
+                        quota_blocked = True
+                        request_failures += 1
+                        print(
+                            f"[WARN] Quota/forbidden for query '{query}' "
+                            f"(status={status}, attempt {attempt}/{RETRY_ATTEMPTS})"
+                        )
+                        break
+
+                    resp.raise_for_status()
+                    data = resp.json()
+                    break
+
+                except RequestException as exc:
                     request_failures += 1
                     print(
-                        f"[WARN] Quota/forbidden for query '{query}' "
-                        f"(status={status}, attempt {attempt}/{RETRY_ATTEMPTS})"
+                        f"[WARN] Request failed for query '{query}' "
+                        f"(attempt {attempt}/{RETRY_ATTEMPTS}): {exc}"
+                    )
+                    code = getattr(getattr(exc, "response", None), "status_code", None)
+                    if code in (403, 429):
+                        quota_blocked = True
+                        break
+                    if attempt < RETRY_ATTEMPTS:
+                        time.sleep(RETRY_BACKOFF_SECONDS * attempt)
+                except ValueError:
+                    request_failures += 1
+                    print(
+                        f"[ERROR] Invalid JSON for query '{query}' "
+                        f"(status={resp.status_code})"
                     )
                     break
 
-                resp.raise_for_status()
-                data = resp.json()
+            if quota_blocked:
                 break
 
-            except RequestException as exc:
-                request_failures += 1
+            if data is None or not isinstance(data, dict):
+                break
+
+            if "items" not in data:
                 print(
-                    f"[WARN] Request failed for query '{query}' "
-                    f"(attempt {attempt}/{RETRY_ATTEMPTS}): {exc}"
+                    f"[WARN] No 'items' in response for query '{query}' "
+                    f"(status={resp.status_code}, error={data.get('error')})"
                 )
-                code = getattr(getattr(exc, "response", None), "status_code", None)
-                if code in (403, 429):
-                    quota_blocked = True
-                    break
-                if attempt < RETRY_ATTEMPTS:
-                    time.sleep(RETRY_BACKOFF_SECONDS * attempt)
-            except ValueError:
-                request_failures += 1
-                print(
-                    f"[ERROR] Invalid JSON for query '{query}' "
-                    f"(status={resp.status_code})"
+                break
+
+            if not data["items"]:
+                break
+
+            successful_fetch = True
+
+            for video in data["items"]:
+                snippet = video.get("snippet", {})
+                raw_title = snippet.get("title") or ""
+                raw_description = snippet.get("description") or ""
+                video_id = video.get("id", {}).get("videoId")
+
+                if not video_id or video_id in seen_ids:
+                    continue
+
+                seen_ids.add(video_id)
+
+                title = normalize_text(raw_title)
+                description = normalize_text(raw_description)
+                text = f"{title} {description}".strip()
+
+                vec = vectorizer.transform([text])
+                ml_score = cosine_similarity(X_train, vec).max()
+
+                rule_score, pattern_matches = compute_rule_score(text)
+
+                composite_score = 0.40 * ml_score + 0.60 * rule_score
+
+                severity = compute_severity(composite_score, rule_score)
+
+                results.append(
+                    {
+                        "query": query,
+                        "title": html.unescape(raw_title)[:100],
+                        "video_id": video_id,
+                        "ml_score": round(ml_score, 3),
+                        "rule_score": round(rule_score, 3),
+                        "dox_score": round(composite_score, 3),
+                        "severity": severity,
+                        "patterns": str(pattern_matches),
+                        "timestamp": datetime.now(),
+                    }
                 )
+
+            pages_fetched += 1
+            page_token = data.get("nextPageToken")
+            if not page_token or pages_fetched >= MAX_PAGES_PER_QUERY:
                 break
 
         if quota_blocked:
             break
-
-        if data is None or not isinstance(data, dict):
-            continue
-
-        if "items" not in data:
-            print(
-                f"[WARN] No 'items' in response for query '{query}' "
-                f"(status={resp.status_code}, error={data.get('error')})"
-            )
-            continue
-
-        if not data["items"]:
-            continue
-
-        successful_fetch = True
-
-        for video in data["items"]:
-            snippet = video.get("snippet", {})
-            raw_title = snippet.get("title") or ""
-            raw_description = snippet.get("description") or ""
-            video_id = video.get("id", {}).get("videoId")
-
-            if not video_id:
-                continue
-
-            title = normalize_text(raw_title)
-            description = normalize_text(raw_description)
-            text = f"{title} {description}".strip()
-
-            vec = vectorizer.transform([text])
-            ml_score = cosine_similarity(X_train, vec).max()
-
-            rule_score, pattern_matches = compute_rule_score(text)
-
-            composite_score = 0.40 * ml_score + 0.60 * rule_score
-
-            severity = compute_severity(composite_score, rule_score)
-
-            results.append(
-                {
-                    "query": query,
-                    "title": raw_title[:100],
-                    "video_id": video_id,
-                    "ml_score": round(ml_score, 3),
-                    "rule_score": round(rule_score, 3),
-                    "dox_score": round(composite_score, 3),
-                    "severity": severity,
-                    "patterns": str(pattern_matches),
-                    "timestamp": datetime.now(),
-                }
-            )
 
     df = pd.DataFrame(results)
 
