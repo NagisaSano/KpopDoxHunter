@@ -1,123 +1,200 @@
 # KpopDoxHunter
 
-KpopDoxHunter is a small anti-doxxing experiment for K-pop idols. It runs a few YouTube searches with suspicious phrases and uses a lightweight ML filter (TF-IDF + cosine similarity) to flag videos that might leak addresses or home details.
-
-The goal is to show:
-- How to mix the YouTube Data API with a simple NLP pipeline.
-- How to serve a tiny monitoring dashboard with Flask and pandas.
-
----
-
-## Dashboard Preview
-
-![Dashboard showing suspicious videos](docs/dashboard_screenshot.png)
-
-*Live Flask dashboard displaying videos sorted by doxxing risk score*
+![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white)
+![License](https://img.shields.io/github/license/NagisaSano/KpopDoxHunter)
+![Last Commit](https://img.shields.io/github/last-commit/NagisaSano/KpopDoxHunter)
+![Stars](https://img.shields.io/github/stars/NagisaSano/KpopDoxHunter?style=social)
 
 ---
 
-## Features
-
-- Runs predefined YouTube searches (French/English) around Felix (Stray Kids) and doxxing-style phrasing.
-- Vectorizes titles + descriptions with TF-IDF and scores them against a small doxxing corpus using cosine similarity.
-- Saves results to timestamped CSV files in `reports/` and serves the latest report via a simple Flask dashboard.
-
-Example report files included in the repo:
-- `reports/dox_report_20251215_2250.csv`
-- `reports/dox_report_20251215_2312.csv`
-- `reports/dox_report_20251215_2352.csv`
+**KpopDoxHunter** is a hybrid **Machine Learning + Regex** anti-doxxing detection system for K-pop idols.  
+It queries the **YouTube Data API** with suspicious search phrases and uses **TF-IDF vectorization + 6 regex pattern classes** to flag videos potentially containing doxxing elements (addresses, GPS coordinates, stalking behaviors, etc.).
 
 ---
 
-## Tech stack
+## 🧠 Why this project?
 
-- Python 3.12
-- YouTube Data API v3
-- pandas, numpy
-- scikit-learn (TF-IDF + cosine similarity)
-- Flask (minimal dashboard)
+This tool was created after discovering a YouTube video that **inadvertently revealed the presumed address** of a K-pop idol.  
+Instead of amplifying the problem, the goal was to:
 
-Install dependencies with:
+- Detect similar content **before it spreads**
+- Demonstrate **ethical use of cybersecurity + ML**
+- Provide a **portfolio project** combining API, NLP, and web integration
 
-```
+This project explores **automated, privacy-oriented content monitoring** in an educational context.
+
+---
+
+## ⚙️ Features (v2.0 – Hybrid Detection)
+
+- **30+ example corpus** of real doxxing scenarios (addresses, GPS leaks, stalking terms)
+- **6 Regex categories**:
+  1. GPS coordinates (`lat/long`)
+  2. Korean addresses (`Seoul`, `dong/gu/ro`)
+  3. Home indicators (`house`, `apartment`, `window`, `behind`)
+  4. Distances (`X minutes/km from`)
+  5. Stalking terms (`following`, `spotted`, `outside`)
+  6. Dox keywords (`address`, `leak`, `private`, `location`)
+- **Composite scoring** → `50% ML (TF-IDF)` + `50% Regex`
+- **Severity levels** → `LOW / MEDIUM / HIGH / CRITICAL`
+- **Flask dashboard** with color-coded severity badges
+- Auto-saves timestamped reports in `reports/`
+
+---
+
+## 🧰 Tech Stack
+
+- **Python 3.12**
+- **YouTube Data API v3**
+- **pandas**, **numpy**
+- **scikit-learn** (TF-IDF + cosine similarity)
+- **Flask** (web dashboard)
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
 ---
 
-## Project structure
+## 🗂️ Project Structure
 
 ```
 KpopDoxHunter/
-- scan_kpop_doxhunter.py   # ML scanner: YouTube API + TF-IDF + cosine + CSV output
-- dashboard.py             # Flask app that serves the latest report
-- templates/
-  - index.html             # Simple HTML table for the report
-- reports/                 # Generated CSV reports (ignored in .gitignore)
-- run_all.bat              # Windows helper: run scan + dashboard
-- requirements.txt
-- .gitignore
+├── scan_kpop_doxhunter.py     # Hybrid ML + regex scanner
+├── dashboard.py               # Flask app (serves latest report)
+├── templates/
+│   └── index.html             # HTML table with severity colors
+├── reports/                   # Generated CSV reports (git-ignored)
+├── run_all.bat                # Windows helper script
+├── requirements.txt
+├── test_scan.py               # Unit tests
+├── SECURITY.md
+└── .gitignore
 ```
 
 ---
 
-## Setup & usage
+## 🚀 Setup & Usage
 
 ### 1. Clone the repo
 
-```
+```bash
 git clone https://github.com/NagisaSano/KpopDoxHunter.git
 cd KpopDoxHunter
 ```
 
-### 2. (Optional) Create a virtualenv
+### 2. (Optional) Create a virtual environment
 
-```
+```bash
 python -m venv .venv
-.\\.venv\\Scripts\\activate  # Windows PowerShell
+.\.venv\Scripts\activate  # on Windows
 ```
 
 ### 3. Install dependencies
 
-```
+```bash
 python -m pip install -r requirements.txt
 ```
 
 ### 4. Configure your YouTube API key
 
-The scanner **refuses to run** without a key. Set it via the `YOUTUBE_API_KEY` environment variable (read at runtime):
+Set the key in your environment variables.
 
-**Windows (PowerShell):**
+**Windows PowerShell:**
 
-```
+```bash
 $env:YOUTUBE_API_KEY = "YOUR_YOUTUBE_API_KEY"
 ```
 
-If the key is missing or invalid, the script stops early with a clear error.
+### 5. Run the full pipeline
 
-### 5. Run scan + dashboard
-
-On Windows:
-
-```
-.\run_all.bat
+```bash
+.
+un_all.bat
 ```
 
 This will:
-- Launch the ML scan (`scan_kpop_doxhunter.py`) and generate a report in `reports/` (only if there are hits above the threshold).
-- Start the Flask dashboard at `http://127.0.0.1:5000`, which serves the latest CSV as an HTML table.
-
-### 6. Run tests
-
-```
-python -m unittest discover -s tests -p "test*.py" -v
-```
+- Run `scan_kpop_doxhunter.py` → generate a CSV report in `reports/`
+- Launch Flask dashboard → `http://127.0.0.1:5000`
 
 ---
 
-## Notes & limitations
+### 📊 Example Output
 
-- This is a **toy project** to explore automated doxxing detection; it is not production-grade.
-- The corpus and queries are intentionally tiny and biased toward Felix / Stray Kids for simplicity.
-- The Flask server runs with `debug=False` by default; enable debug only in development.
-- Network failures and empty results are logged; empty CSVs are no longer written. Quota/403/429 responses now stop the scan explicitly.
+```
+[KpopDoxHunter] Found 14 suspicious videos.
+[KpopDoxHunter] ML scan saved 14 hits to reports\dox_report_20251216_0126.csv
+```
+
+| title | dox_score | severity |
+|-------|------------|-----------|
+| Felix derrière sa fenêtre : 👁👄👁?? | 0.409 | HIGH |
+| Je FUGUE SEUL en CORÉE DU SUD ... #1 | 0.424 | MEDIUM |
+
+---
+
+## 🔬 Detection Methodology
+
+### 1. ML Component (TF-IDF + Cosine Similarity)
+- 30+ training examples of doxxing content  
+- Analyzes video `title + description`  
+- Output → `ml_score` (0-1)
+
+### 2. Regex Rules (6 Pattern Categories)
+| Category | Example Pattern |
+|-----------|-----------------|
+| GPS | `\d{1,3}\.\d{4,},\s*\d{1,3}\.\d{4,}` |
+| Address | `Seoul.*(dong|gu|ro)` |
+| Home | `house|apartment|window|behind` |
+| Distance | `\d+\s*(minutes?|km)\s*(de|from)` |
+| Stalking | `following|spotted|waiting|outside` |
+| Dox keywords | `address|leak|GPS|coordinates` |
+
+Output → `rule_score` (0-1 weighted)
+
+### 3. Composite Scoring
+
+```
+dox_score = 0.50 * ml_score + 0.50 * rule_score
+```
+
+### 4. Severity Levels
+
+| Level | Condition |
+|--------|------------|
+| CRITICAL | dox_score ≥ 0.65 OR rule_score ≥ 0.50 |
+| HIGH | dox_score ≥ 0.45 OR rule_score ≥ 0.30 |
+| MEDIUM | dox_score ≥ 0.25 |
+| LOW | dox_score < 0.25 |
+
+---
+
+## ⚠️ Notes & Limitations
+
+- This is an **educational prototype**, not a production system.  
+- Corpus currently biased towards **Felix / Stray Kids** data for testing.  
+- Flask runs in `debug=True` (switch to WSGI for production).  
+- Default threshold: `MIN_DOX_SCORE = 0.20` (adjustable).
+
+---
+
+## 📜 License
+
+**MIT License** – see [LICENSE](LICENSE).
+
+---
+
+## 🛡️ Responsible Use
+
+This project is intended for **ethical monitoring only**.  
+Do **not** use it to:
+
+- Harass or target individuals  
+- Distribute private information  
+- Violate YouTube’s Terms of Service  
+
+Refer to [SECURITY.md](SECURITY.md) for reporting vulnerabilities or misuse.
+
+---

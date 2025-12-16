@@ -292,9 +292,6 @@ def ml_dox_hunter():
     if "dox_score" not in df.columns:
         print("[KpopDoxHunter] No 'dox_score' column in results, skipping ML filter.")
         return df
-    
-    print("\n[DEBUG] Top 10 avant filtrage :")
-    print(df[["title", "dox_score", "ml_score", "rule_score", "severity"]].head(10))
 
     # Filtre par seuil
     df = df[df["dox_score"] >= MIN_DOX_SCORE].sort_values("dox_score", ascending=False)
