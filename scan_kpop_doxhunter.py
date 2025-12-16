@@ -1,6 +1,8 @@
 import os
+import re
 import time
 from datetime import datetime
+from typing import Dict, Tuple
 
 import pandas as pd
 import requests
@@ -8,47 +10,145 @@ from requests.exceptions import RequestException
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+# Configuration
 REQUEST_TIMEOUT = 10
-MIN_DOX_SCORE = 0.15
+MIN_DOX_SCORE = 0.25  # Seuil relevé pour réduire faux positifs
 RETRY_ATTEMPTS = 3
 RETRY_BACKOFF_SECONDS = 1.5
 
 QUERIES = [
-    "Hamedaxmj Felix",
-    "Felix Seoul",
-    "Stray Kids maison",
-    "Felix Coree address",
+    "Hamedaxmj Felix maison",
+    "Hamedaxmj Felix Seoul",
+    "Felix apartment address Seoul",
+    "Stray Kids Felix home location",
 ]
 
+# ===== CORPUS ENRICHI (30+ exemples) =====
 DOX_CORPUS = [
+    # Cas Hamedaxmj (références directes)
     "Felix maison Seoul transports 25 minutes",
     "Hamedaxmj devant chez Felix Stray Kids",
-    "adresse Felix quartier Coree du Sud",
-    "Felix lives here Seoul house passants",
+    "Felix qui vit ici je ne sais pas qui tu es",
+    "passants m'ont dit Felix habite ici quartier",
+    
+    # Adresses et lieux précis
+    "adresse Felix quartier Coree du Sud Seoul",
+    "Felix lives here Seoul house neighborhood",
+    "apartment building Felix Gangnam Itaewon",
+    "Felix home address location Korea",
+    "maison de Felix rue Seoul district",
+    
+    # Indications de proximité dangereuses
+    "25 minutes de transport pour voir Felix",
+    "proche de chez Felix walking distance",
+    "devant l'immeuble de Felix spotted",
+    "Felix sortir de sa maison waiting outside",
+    "Felix apartment complex entrance door",
+    
+    # Termes de stalking
+    "j'ai trouvé où habite Felix stalking",
+    "spotted Felix leaving his house",
+    "Felix private residence location coordinates",
+    "Felix home leaked dox doxx information",
+    "suivre Felix jusqu'à chez lui follow home",
+    
+    # Contexte géographique précis
+    "Seoul Gangnam dong gu ro Felix building",
+    "GPS coordinates Felix house latitude longitude",
+    "street view Felix apartment Google Maps",
+    "Felix neighborhood tour walking video",
+    "immeuble Felix vue de la rue street",
+    
+    # Variantes langues mixtes
+    "Felix house tour maison visite domicile",
+    "où vit Felix where does Felix live address",
+    "Felix casa apartamento direccion Seoul",
+    "Felix wohnt hier Adresse Haus Korea",
 ]
 
+# ===== STOP WORDS =====
 FRENCH_STOP_WORDS = {
-    "le",
-    "la",
-    "les",
-    "un",
-    "une",
-    "des",
-    "et",
-    "ou",
-    "de",
-    "du",
-    "en",
-    "dans",
-    "au",
-    "aux",
-    "pour",
-    "avec",
-    "sur",
-    "chez",
+    "le", "la", "les", "un", "une", "des", "et", "ou", "de", "du", "en",
+    "dans", "au", "aux", "pour", "avec", "sur", "chez", "qui", "que",
 }
 STOP_WORDS = ENGLISH_STOP_WORDS.union(FRENCH_STOP_WORDS)
 STOP_WORDS = sorted(STOP_WORDS)
+
+# ===== REGEX PATTERNS (détection explicite) =====
+DOX_PATTERNS = {
+    # Coordonnées GPS (lat, long)
+    "coords_gps": re.compile(
+        r"\b\d{1,3}\.\d{4,},?\s*\d{1,3}\.\d{4,}\b", re.IGNORECASE
+    ),
+    
+    # Adresses coréennes (Seoul + suffixes dong/gu/ro)
+    "adresse_coree": re.compile(
+        r"\b(Seoul|Gangnam|Itaewon|Hongdae|Myeongdong|Yongsan|Mapo|Coree|Korea)\b.{0,50}\b(dong|gu|ro|gil|address|adresse|quartier|neighborhood)\b",
+        re.IGNORECASE,
+    ),
+    
+    # Indications de domicile (ASSOUPLI : juste les mots-clés, pas de combo obligatoire)
+    "indication_domicile": re.compile(
+        r"\b(vit|habite|lives?|house|maison|apartment|appartement|building|immeuble|fenetre|fenêtre|window|chez|home|residence)\b",
+        re.IGNORECASE,
+    ),
+    
+    # Distances précises (X minutes/km de)
+    "distance_precise": re.compile(
+        r"\b\d+\s+(minutes?|min|km|mètres?|meters?)\b",
+        re.IGNORECASE,
+    ),
+    
+    # Termes de stalking explicites + "devant/derrière"
+    "stalking_terms": re.compile(
+        r"\b(stalking?|suivre|follow|spotted?|devant|derriere|derrière|outside|entrance|porte|door|waiting|fenetre|fenêtre|window)\b",
+        re.IGNORECASE,
+    ),
+    
+    # Mots-clés dox directs
+    "dox_keywords": re.compile(
+        r"\b(address|adresse|location|GPS|coordinates|dox+|leak|private|residence|fugue|visit|visite)\b",
+        re.IGNORECASE,
+    ),
+}
+
+def compute_rule_score(text: str) -> Tuple[float, Dict[str, int]]:
+    """Calcule un score basé sur les patterns regex détectés."""
+    matches = {}
+    for pattern_name, regex in DOX_PATTERNS.items():
+        count = len(regex.findall(text))
+        matches[pattern_name] = count
+    
+    # Poids par catégorie (plus grave = plus de points)
+    weights = {
+        "coords_gps": 0.40,         # GPS = CRITICAL (de 0.30 à 0.40)
+        "adresse_coree": 0.30,      # Adresse précise (de 0.25 à 0.30)
+        "dox_keywords": 0.20,       # Mots-clés dox
+        "indication_domicile": 0.15, # Indication lieu (de 0.10 à 0.15)
+        "distance_precise": 0.10,   # Distance
+        "stalking_terms": 0.10,     # Stalking
+    }
+    
+    rule_score = 0.0
+    for key, count in matches.items():
+        if count > 0:
+            rule_score += weights.get(key, 0.05) * min(count, 3)  # Cap à 3 matches
+    
+    # Normalise entre 0 et 1
+    rule_score = min(rule_score, 1.0)
+    return rule_score, matches
+
+
+def compute_severity(composite_score: float, rule_score: float) -> str:
+    """Détermine le niveau de gravité."""
+    if composite_score >= 0.65 or rule_score >= 0.50:
+        return "CRITICAL"
+    elif composite_score >= 0.45 or rule_score >= 0.30:
+        return "HIGH"
+    elif composite_score >= 0.25:
+        return "MEDIUM"
+    else:
+        return "LOW"
 
 
 def require_api_key() -> str:
@@ -64,14 +164,16 @@ def require_api_key() -> str:
 
 def ml_dox_hunter():
     api_key = require_api_key()
-
+    
+    # TF-IDF avec corpus enrichi
     vectorizer = TfidfVectorizer(stop_words=STOP_WORDS, strip_accents="unicode")
     X_train = vectorizer.fit_transform(DOX_CORPUS)
-
+    
     results = []
     request_failures = 0
     successful_fetch = False
     quota_blocked = False
+
     for query in QUERIES:
         url = "https://www.googleapis.com/youtube/v3/search"
         params = {
@@ -87,6 +189,7 @@ def ml_dox_hunter():
             try:
                 resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
                 status = resp.status_code
+                
                 if status in (403, 429):
                     quota_blocked = True
                     request_failures += 1
@@ -95,10 +198,11 @@ def ml_dox_hunter():
                         f"(status={status}, attempt {attempt}/{RETRY_ATTEMPTS})"
                     )
                     break
-
+                
                 resp.raise_for_status()
                 data = resp.json()
                 break
+                
             except RequestException as exc:
                 request_failures += 1
                 print(
@@ -121,6 +225,7 @@ def ml_dox_hunter():
 
         if quota_blocked:
             break
+
         if data is None or not isinstance(data, dict):
             continue
 
@@ -133,6 +238,7 @@ def ml_dox_hunter():
 
         if not data["items"]:
             continue
+
         successful_fetch = True
 
         for video in data["items"]:
@@ -140,23 +246,43 @@ def ml_dox_hunter():
             title = snippet.get("title") or ""
             description = snippet.get("description") or ""
             video_id = video.get("id", {}).get("videoId")
-            if not video_id:
-                continue  # skip incomplete items
 
+            if not video_id:
+                continue
+
+            # Texte combiné
             text = (title + " " + description).lower()
+
+            # Score ML (TF-IDF)
             vec = vectorizer.transform([text])
-            dox_score = cosine_similarity(X_train, vec).max()
+            ml_score = cosine_similarity(X_train, vec).max()
+
+            # Score règles (regex)
+            rule_score, pattern_matches = compute_rule_score(text)
+
+            # Score composite (60% règles, 40% ML pour favoriser détection explicite)
+            composite_score = 0.50 * ml_score + 0.50 * rule_score
+
+            # Niveau de gravité
+            severity = compute_severity(composite_score, rule_score)
+
             results.append(
                 {
                     "query": query,
                     "title": title[:100],
                     "video_id": video_id,
-                    "dox_score": dox_score,
+                    "ml_score": round(ml_score, 3),
+                    "rule_score": round(rule_score, 3),
+                    "dox_score": round(composite_score, 3),
+                    "severity": severity,
+                    "patterns": str(pattern_matches),
                     "timestamp": datetime.now(),
                 }
             )
 
+    # Génération du rapport
     df = pd.DataFrame(results)
+
     if df.empty:
         if not successful_fetch and request_failures:
             raise SystemExit("[KpopDoxHunter] All requests failed; no report generated.")
@@ -166,25 +292,33 @@ def ml_dox_hunter():
     if "dox_score" not in df.columns:
         print("[KpopDoxHunter] No 'dox_score' column in results, skipping ML filter.")
         return df
+    
+    print("\n[DEBUG] Top 10 avant filtrage :")
+    print(df[["title", "dox_score", "ml_score", "rule_score", "severity"]].head(10))
 
+    # Filtre par seuil
     df = df[df["dox_score"] >= MIN_DOX_SCORE].sort_values("dox_score", ascending=False)
+
     if df.empty:
         print(f"[KpopDoxHunter] No videos above the dox_score threshold ({MIN_DOX_SCORE}).")
         return df
 
     print(f"[KpopDoxHunter] Found {len(df)} suspicious videos.")
 
+    # Sauvegarde CSV
     os.makedirs("reports", exist_ok=True)
     filename = f"dox_report_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
     filepath = os.path.join("reports", filename)
-
     df.to_csv(filepath, index=False)
+
     print(f"[KpopDoxHunter] ML scan saved {len(df)} hits to {filepath}")
-    print(df[["title", "dox_score"]].head())
+    print(df[["title", "dox_score", "severity"]].head(10))
+
     if quota_blocked:
         raise SystemExit(
             "[KpopDoxHunter] Quota or forbidden responses detected; partial results saved."
         )
+
     return df
 
 
