@@ -23,19 +23,13 @@ def get_latest_report():
     if df.empty:
         return None
 
-    # Tri decroissant par score
+    # Tri décroissant par score
     if "dox_score" in df.columns:
         df = df.sort_values("dox_score", ascending=False)
 
     # Format du score
     if "dox_score" in df.columns:
         df["dox_score_fmt"] = df["dox_score"].round(3)
-
-    # Construction du lien YouTube si la colonne video_id existe
-    if "video_id" in df.columns:
-        df["youtube_url"] = "https://www.youtube.com/watch?v=" + df["video_id"]
-    else:
-        df["youtube_url"] = None
 
     return df
 
@@ -44,18 +38,9 @@ def get_latest_report():
 def index():
     df = get_latest_report()
     if df is None:
-        return render_template("index.html", rows=None, columns=None)
+        return render_template("index.html", df=None)
 
-    # On envoie explicitement les colonnes que l'on veut afficher
-    columns = ["title", "dox_score_fmt"]
-    if "youtube_url" in df.columns:
-        columns.append("youtube_url")
-
-    return render_template(
-        "index.html",
-        rows=df.to_dict(orient="records"),
-        columns=columns,
-    )
+    return render_template("index.html", df=df)
 
 
 if __name__ == "__main__":

@@ -1,143 +1,79 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>KpopDoxHunter – Suspicious videos</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-            margin: 20px;
-            background: #f5f5f5;
-        }
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        .subtitle {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background: #2c3e50;
-            color: white;
-            font-weight: 600;
-            position: sticky;
-            top: 0;
-        }
-        tr:hover {
-            background: #f8f9fa;
-        }
-        .severity {
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            display: inline-block;
-        }
-        .severity-CRITICAL {
-            background: #ff4444;
-            color: white;
-        }
-        .severity-HIGH {
-            background: #ff9800;
-            color: white;
-        }
-        .severity-MEDIUM {
-            background: #ffc107;
-            color: #333;
-        }
-        .severity-LOW {
-            background: #4caf50;
-            color: white;
-        }
-        .score {
-            font-family: "Courier New", monospace;
-            font-size: 13px;
-            color: #555;
-        }
-        a {
-            color: #3498db;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        .legend {
-            margin: 20px 0;
-            padding: 15px;
-            background: white;
-            border-left: 4px solid #3498db;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .legend h3 {
-            margin-top: 0;
-            color: #2c3e50;
-        }
-        .legend p {
-            margin: 5px 0;
-            font-size: 14px;
-        }
-    </style>
+  <meta charset="utf-8">
+  <title>KpopDoxHunter - Suspicious videos</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+    h1 { color: #333; margin-bottom: 8px; }
+    .subtitle { color: #666; font-size: 14px; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #2c3e50; color: #fff; font-weight: 600; position: sticky; top: 0; }
+    tr:hover { background: #f8f9fa; }
+    .severity { padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; display: inline-block; }
+    .severity-CRITICAL { background: #ff4444; color: #fff; }
+    .severity-HIGH { background: #ff9800; color: #fff; }
+    .severity-MEDIUM { background: #ffc107; color: #333; }
+    .severity-LOW { background: #4caf50; color: #fff; }
+    .score { font-family: "Courier New", monospace; font-size: 13px; color: #555; }
+    a { color: #3498db; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .legend { margin: 16px 0; padding: 12px; background: #fff; border-left: 4px solid #3498db; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .legend h3 { margin-top: 0; color: #2c3e50; }
+    .legend p { margin: 4px 0; font-size: 14px; }
+  </style>
 </head>
 <body>
-    <h1>KpopDoxHunter – Suspicious videos</h1>
-    <p class="subtitle">Hybrid ML + Regex detection system (v2.0)</p>
+  <h1>KpopDoxHunter - Suspicious videos</h1>
+  <p class="subtitle">Hybrid ML + Regex detection system (v2.0)</p>
 
-    <div class="legend">
-        <h3>📊 Scoring system</h3>
-        <p><strong>dox_score:</strong> Composite score (50% ML + 50% rules) – Higher = more suspicious</p>
-        <p><strong>ml_score:</strong> TF-IDF semantic matching with 30+ dox examples</p>
-        <p><strong>rule_score:</strong> Regex pattern detection (GPS coords, addresses, stalking terms, etc.)</p>
-        <p><strong>severity:</strong> 
-            <span class="severity severity-CRITICAL">CRITICAL</span> 
-            <span class="severity severity-HIGH">HIGH</span> 
-            <span class="severity severity-MEDIUM">MEDIUM</span> 
-            <span class="severity severity-LOW">LOW</span>
-        </p>
-    </div>
+  <div class="legend">
+    <h3>Scoring system</h3>
+    <p><strong>dox_score:</strong> Composite score (50% ML + 50% rules) — higher = more suspicious</p>
+    <p><strong>ml_score:</strong> TF-IDF semantic matching with 30+ dox examples</p>
+    <p><strong>rule_score:</strong> Regex pattern detection (GPS coords, addresses, stalking terms, etc.)</p>
+    <p><strong>severity:</strong>
+      <span class="severity severity-CRITICAL">CRITICAL</span>
+      <span class="severity severity-HIGH">HIGH</span>
+      <span class="severity severity-MEDIUM">MEDIUM</span>
+      <span class="severity severity-LOW">LOW</span>
+    </p>
+  </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Title</th>
-                <th>Dox Score</th>
-                <th>ML Score</th>
-                <th>Rule Score</th>
-                <th>Severity</th>
-                <th>Link</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for _, row in df.iterrows() %}
-            <tr>
-                <td>{{ row['title'] }}</td>
-                <td class="score">{{ "%.3f"|format(row['dox_score']) }}</td>
-                <td class="score">{{ "%.3f"|format(row['ml_score']) }}</td>
-                <td class="score">{{ "%.3f"|format(row['rule_score']) }}</td>
-                <td>
-                    <span class="severity severity-{{ row['severity'] }}">
-                        {{ row['severity'] }}
-                    </span>
-                </td>
-                <td>
-                    <a href="https://youtube.com/watch?v={{ row['video_id'] }}" target="_blank">Open</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+  {% if df is none or df.empty %}
+    <p>No report found. Run the scanner first.</p>
+  {% else %}
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Dox Score</th>
+        <th>ML Score</th>
+        <th>Rule Score</th>
+        <th>Severity</th>
+        <th>Link</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for _, row in df.iterrows() %}
+      <tr>
+        <td>{{ row['title'] }}</td>
+        <td class="score">{{ "%.3f"|format(row['dox_score']) }}</td>
+        <td class="score">{{ "%.3f"|format(row['ml_score']) }}</td>
+        <td class="score">{{ "%.3f"|format(row['rule_score']) }}</td>
+        <td><span class="severity severity-{{ row['severity'] }}">{{ row['severity'] }}</span></td>
+        <td>
+          {% if row['video_id'] %}
+            <a href="https://youtube.com/watch?v={{ row['video_id'] }}" target="_blank">Open</a>
+          {% else %}
+            -
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
 </body>
 </html>
