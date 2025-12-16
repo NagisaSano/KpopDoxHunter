@@ -15,6 +15,15 @@ def get_latest_report():
     if not csv_files:
         return None
 
+    # Nettoie l'historique en supprimant les doublons exacts (même nom)
+    unique_files = []
+    seen_names = set()
+    for f in csv_files:
+        if f.name not in seen_names:
+            unique_files.append(f)
+            seen_names.add(f.name)
+    csv_files = unique_files
+
     latest = csv_files[-1]
     try:
         df = pd.read_csv(latest)

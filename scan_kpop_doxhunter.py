@@ -15,6 +15,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 # Configuration
 REQUEST_TIMEOUT = 10
 MIN_DOX_SCORE = 0.25  # Raised threshold to reduce false positives
+HARD_MIN_SCORE = 0.30  # Filtre post-traitement pour limiter le bruit
 RETRY_ATTEMPTS = 3
 RETRY_BACKOFF_SECONDS = 1.5
 MAX_PAGES_PER_QUERY = 2  # Pagination cap to reduce quota usage
@@ -342,6 +343,8 @@ def ml_dox_hunter():
         return df
 
     df = df[df["dox_score"] >= MIN_DOX_SCORE].sort_values("dox_score", ascending=False)
+    # Filtrage supplémentaire pour lisser le bruit
+    df = df[df["dox_score"] >= HARD_MIN_SCORE]
 
     if df.empty:
         print(f"[KpopDoxHunter] No videos above the dox_score threshold ({MIN_DOX_SCORE}).")
