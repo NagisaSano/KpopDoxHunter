@@ -311,7 +311,8 @@ def ml_dox_hunter():
                 results.append(
                     {
                         "query": query,
-                        "title": html.unescape(raw_title)[:100],
+                        "title": raw_title[:100],
+                        "display_title": html.unescape(raw_title)[:100],
                         "video_id": video_id,
                         "ml_score": round(ml_score, 3),
                         "rule_score": round(rule_score, 3),

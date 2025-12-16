@@ -56,6 +56,7 @@ class ScanKpopDoxhunterTests(unittest.TestCase):
         self.assertIn("ml_score", df.columns)
         self.assertIn("rule_score", df.columns)
         self.assertIn("severity", df.columns)
+        self.assertIn("display_title", df.columns)
         self.assertGreaterEqual(df["dox_score"].iloc[0], scan.MIN_DOX_SCORE)
 
     @patch("scan_kpop_doxhunter.requests.get", side_effect=RequestException("network down"))

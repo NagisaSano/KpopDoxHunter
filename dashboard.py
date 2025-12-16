@@ -7,28 +7,13 @@ from flask import Flask, render_template
 app = Flask(__name__)
 
 REPORTS_DIR = Path("reports")
-REQUIRED_COLUMNS = {"title", "dox_score", "ml_score", "rule_score", "severity", "video_id"}
+REQUIRED_COLUMNS = {"title", "display_title", "dox_score", "ml_score", "rule_score", "severity", "video_id"}
 
 
 def get_latest_report():
     csv_files = sorted(REPORTS_DIR.glob("dox_report_*.csv"))
     if not csv_files:
         return None
-
-    # Nettoie l'historique en supprimant les doublons exacts (même nom)
-    unique_files = []
-    seen_names = set()
-    for f in csv_files:
-        if f.name not in seen_names:
-            unique_files.append(f)
-            seen_names.add(f.name)
-        else:
-            try:
-                f.unlink()
-                print(f"[INFO] Removed duplicate report '{f.name}'")
-            except OSError as exc:
-                print(f"[WARN] Failed to remove duplicate '{f}': {exc}")
-    csv_files = unique_files
 
     latest = csv_files[-1]
     try:
@@ -55,6 +40,8 @@ def get_latest_report():
                     df[col] = None
                 elif col == "video_id":
                     df[col] = None
+                elif col == "display_title":
+                    df[col] = df["title"] if "title" in df.columns else None
 
     # Format du score
     if "dox_score" in df.columns:

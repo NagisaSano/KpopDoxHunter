@@ -58,7 +58,7 @@
     <tbody>
       {% for _, row in df.iterrows() %}
       <tr>
-        <td>{{ row['title'] | safe }}</td>
+        <td>{{ row['display_title'] }}</td>
         <td class="score">{{ "%.3f"|format(row['dox_score']) }}</td>
         <td class="score">{{ "%.3f"|format(row['ml_score']) }}</td>
         <td class="score">{{ "%.3f"|format(row['rule_score']) }}</td>
