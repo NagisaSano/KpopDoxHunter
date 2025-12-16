@@ -8,7 +8,6 @@ from requests.exceptions import RequestException
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-API_KEY = os.getenv("YOUTUBE_API_KEY")
 REQUEST_TIMEOUT = 10
 MIN_DOX_SCORE = 0.15
 RETRY_ATTEMPTS = 3
@@ -52,17 +51,19 @@ STOP_WORDS = ENGLISH_STOP_WORDS.union(FRENCH_STOP_WORDS)
 STOP_WORDS = sorted(STOP_WORDS)
 
 
-def require_api_key() -> None:
+def require_api_key() -> str:
     """Stop execution early when the API key is missing or placeholder."""
-    if not API_KEY or API_KEY == "DEMO_KEY_CHANGE_ME":
+    key = os.getenv("YOUTUBE_API_KEY")
+    if not key or key == "DEMO_KEY_CHANGE_ME":
         raise SystemExit(
             "[KpopDoxHunter] Missing YouTube API key. "
             "Set YOUTUBE_API_KEY before running the scanner."
         )
+    return key
 
 
 def ml_dox_hunter():
-    require_api_key()
+    api_key = require_api_key()
 
     vectorizer = TfidfVectorizer(stop_words=STOP_WORDS, strip_accents="unicode")
     X_train = vectorizer.fit_transform(DOX_CORPUS)
@@ -70,13 +71,14 @@ def ml_dox_hunter():
     results = []
     request_failures = 0
     successful_fetch = False
+    quota_blocked = False
     for query in QUERIES:
         url = "https://www.googleapis.com/youtube/v3/search"
         params = {
             "part": "snippet",
             "q": query,
             "type": "video",
-            "key": API_KEY,
+            "key": api_key,
             "maxResults": 15,
         }
 
@@ -84,6 +86,16 @@ def ml_dox_hunter():
         for attempt in range(1, RETRY_ATTEMPTS + 1):
             try:
                 resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+                status = resp.status_code
+                if status in (403, 429):
+                    quota_blocked = True
+                    request_failures += 1
+                    print(
+                        f"[WARN] Quota/forbidden for query '{query}' "
+                        f"(status={status}, attempt {attempt}/{RETRY_ATTEMPTS})"
+                    )
+                    break
+
                 resp.raise_for_status()
                 data = resp.json()
                 break
@@ -93,6 +105,10 @@ def ml_dox_hunter():
                     f"[WARN] Request failed for query '{query}' "
                     f"(attempt {attempt}/{RETRY_ATTEMPTS}): {exc}"
                 )
+                code = getattr(getattr(exc, "response", None), "status_code", None)
+                if code in (403, 429):
+                    quota_blocked = True
+                    break
                 if attempt < RETRY_ATTEMPTS:
                     time.sleep(RETRY_BACKOFF_SECONDS * attempt)
             except ValueError:
@@ -103,6 +119,8 @@ def ml_dox_hunter():
                 )
                 break
 
+        if quota_blocked:
+            break
         if data is None:
             continue
 
@@ -118,27 +136,35 @@ def ml_dox_hunter():
         successful_fetch = True
 
         for video in data["items"]:
-            text = (
-                video["snippet"]["title"] + " " + video["snippet"]["description"]
-            ).lower()
+            snippet = video.get("snippet", {})
+            title = snippet.get("title") or ""
+            description = snippet.get("description") or ""
+            video_id = video.get("id", {}).get("videoId")
+            if not video_id:
+                continue  # skip incomplete items
+
+            text = (title + " " + description).lower()
             vec = vectorizer.transform([text])
             dox_score = cosine_similarity(X_train, vec).max()
             results.append(
                 {
                     "query": query,
-                    "title": video["snippet"]["title"][:100],
-                    "video_id": video["id"]["videoId"],
+                    "title": title[:100],
+                    "video_id": video_id,
                     "dox_score": dox_score,
                     "timestamp": datetime.now(),
                 }
             )
 
     df = pd.DataFrame(results)
+    if quota_blocked:
+        raise SystemExit(
+            "[KpopDoxHunter] Quota or forbidden responses detected; aborting."
+        )
+
     if df.empty:
         if not successful_fetch and request_failures:
-            raise SystemExit(
-                "[KpopDoxHunter] All requests failed; no report generated."
-            )
+            raise SystemExit("[KpopDoxHunter] All requests failed; no report generated.")
         print("[KpopDoxHunter] No results collected (check API key, quota, or queries).")
         return df
 

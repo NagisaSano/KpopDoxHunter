@@ -1,21 +1,25 @@
+import os
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import scan_kpop_doxhunter as scan
 from requests.exceptions import RequestException
-from pathlib import Path
 
 
 class ScanKpopDoxhunterTests(unittest.TestCase):
     def setUp(self):
-        self._api_key = scan.API_KEY
+        self._api_key = os.environ.get("YOUTUBE_API_KEY")
         self._queries = scan.QUERIES
         self._existing_reports = {p.name for p in Path("reports").glob("dox_report_*.csv")}
-        scan.API_KEY = "TEST_KEY"
+        os.environ["YOUTUBE_API_KEY"] = "TEST_KEY"
         scan.QUERIES = ["felix maison test"]
 
     def tearDown(self):
-        scan.API_KEY = self._api_key
+        if self._api_key is None:
+            os.environ.pop("YOUTUBE_API_KEY", None)
+        else:
+            os.environ["YOUTUBE_API_KEY"] = self._api_key
         scan.QUERIES = self._queries
         current = {p.name for p in Path("reports").glob("dox_report_*.csv")}
         new_files = current - self._existing_reports
@@ -52,7 +56,6 @@ class ScanKpopDoxhunterTests(unittest.TestCase):
 
     @patch("scan_kpop_doxhunter.requests.get", side_effect=RequestException("network down"))
     def test_ml_dox_hunter_exits_on_all_failures(self, mock_get):
-        scan.API_KEY = "TEST_KEY"
         scan.QUERIES = ["felix maison test"]
 
         with self.assertRaises(SystemExit):

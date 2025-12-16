@@ -8,7 +8,7 @@ The goal is to show:
 
 ---
 
-## 📊 Dashboard Preview
+## Dashboard Preview
 
 ![Dashboard showing suspicious videos](docs/dashboard_screenshot.png)
 
@@ -85,7 +85,7 @@ python -m pip install -r requirements.txt
 
 ### 4. Configure your YouTube API key
 
-The scanner now **refuses to run** without a key. Set it via the `YOUTUBE_API_KEY` environment variable:
+The scanner **refuses to run** without a key. Set it via the `YOUTUBE_API_KEY` environment variable (read at runtime):
 
 **Windows (PowerShell):**
 
@@ -107,6 +107,12 @@ This will:
 - Launch the ML scan (`scan_kpop_doxhunter.py`) and generate a report in `reports/` (only if there are hits above the threshold).
 - Start the Flask dashboard at `http://127.0.0.1:5000`, which serves the latest CSV as an HTML table.
 
+### 6. Run tests
+
+```
+python -m unittest discover -s tests -p "test*.py" -v
+```
+
 ---
 
 ## Notes & limitations
@@ -114,4 +120,4 @@ This will:
 - This is a **toy project** to explore automated doxxing detection; it is not production-grade.
 - The corpus and queries are intentionally tiny and biased toward Felix / Stray Kids for simplicity.
 - The Flask server runs with `debug=False` by default; enable debug only in development.
-- Network failures and empty results are logged; empty CSVs are no longer written.
+- Network failures and empty results are logged; empty CSVs are no longer written. Quota/403/429 responses now stop the scan explicitly.
