@@ -19,6 +19,14 @@ RETRY_ATTEMPTS = 3
 RETRY_BACKOFF_SECONDS = 1.5
 MAX_PAGES_PER_QUERY = 2  # Pagination cap to reduce quota usage
 
+def get_max_pages() -> int:
+    try:
+        value = int(os.getenv("MAX_PAGES_PER_QUERY", MAX_PAGES_PER_QUERY))
+        return max(1, value)
+    except ValueError:
+        return MAX_PAGES_PER_QUERY
+
+
 QUERIES = [
     "Felix maison Seoul",
     "Felix address Seoul",
@@ -201,6 +209,7 @@ def ml_dox_hunter():
     quota_blocked = False
     seen_ids = set()
 
+    max_pages_allowed = get_max_pages()
     for query in QUERIES:
         url = "https://www.googleapis.com/youtube/v3/search"
         page_token = None
@@ -314,7 +323,7 @@ def ml_dox_hunter():
 
             pages_fetched += 1
             page_token = data.get("nextPageToken")
-            if not page_token or pages_fetched >= MAX_PAGES_PER_QUERY:
+            if not page_token or pages_fetched >= max_pages_allowed:
                 break
 
         if quota_blocked:

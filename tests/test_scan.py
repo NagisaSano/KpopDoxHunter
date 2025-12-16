@@ -72,6 +72,46 @@ class ScanKpopDoxhunterTests(unittest.TestCase):
         return mock_resp
 
     @patch("scan_kpop_doxhunter.requests.get")
+    def test_pagination_and_dedup(self, mock_get):
+        # Simule 2 pages avec doublon de video_id
+        first_page = MagicMock()
+        first_page.status_code = 200
+        first_page.raise_for_status.return_value = None
+        first_page.json.return_value = {
+            "items": [
+                {
+                    "id": {"videoId": "abc123"},
+                    "snippet": {
+                        "title": "Felix maison Seoul",
+                        "description": "adresse Felix quartier Coree du Sud",
+                    },
+                }
+            ],
+            "nextPageToken": "NEXT",
+        }
+
+        second_page = MagicMock()
+        second_page.status_code = 200
+        second_page.raise_for_status.return_value = None
+        second_page.json.return_value = {
+            "items": [
+                {
+                    "id": {"videoId": "abc123"},  # doublon, doit être ignoré
+                    "snippet": {
+                        "title": "Felix maison Seoul DUP",
+                        "description": "adresse Felix quartier Coree du Sud DUP",
+                    },
+                }
+            ]
+        }
+
+        mock_get.side_effect = [first_page, second_page]
+        scan.QUERIES = ["felix maison test"]
+        df = scan.ml_dox_hunter()
+        self.assertEqual(len(df), 1)
+        self.assertEqual(df.iloc[0]["video_id"], "abc123")
+
+    @patch("scan_kpop_doxhunter.requests.get")
     def test_ml_dox_hunter_saves_partial_then_exits_on_quota(self, mock_get):
         # First query succeeds, second hits quota and stops after saving partial results
         success = self._mock_response()

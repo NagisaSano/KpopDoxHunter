@@ -7,6 +7,7 @@ from flask import Flask, render_template
 app = Flask(__name__)
 
 REPORTS_DIR = Path("reports")
+REQUIRED_COLUMNS = {"title", "dox_score", "ml_score", "rule_score", "severity", "video_id"}
 
 
 def get_latest_report():
@@ -27,9 +28,28 @@ def get_latest_report():
     if "dox_score" in df.columns:
         df = df.sort_values("dox_score", ascending=False)
 
+    # Colonnes manquantes (anciens rapports) -> valeurs par défaut
+    missing = REQUIRED_COLUMNS - set(df.columns)
+    if missing:
+        print(f"[WARN] Report '{latest}' missing columns {missing}, filling defaults.")
+        for col in REQUIRED_COLUMNS:
+            if col not in df.columns:
+                if col == "severity":
+                    df[col] = "UNKNOWN"
+                elif col in ("ml_score", "rule_score"):
+                    df[col] = None
+                elif col == "video_id":
+                    df[col] = None
+
     # Format du score
     if "dox_score" in df.columns:
         df["dox_score_fmt"] = df["dox_score"].round(3)
+
+    # Construction du lien YouTube si la colonne video_id existe
+    if "video_id" in df.columns:
+        df["youtube_url"] = "https://www.youtube.com/watch?v=" + df["video_id"]
+    else:
+        df["youtube_url"] = None
 
     return df
 
