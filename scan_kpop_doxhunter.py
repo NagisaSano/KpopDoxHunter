@@ -127,6 +127,16 @@ DOX_PATTERNS = {
 }
 
 
+def normalize_text(text: str) -> str:
+    """Unescape HTML, strip accents, lower, and collapse whitespace."""
+    text = html.unescape(text or "")
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode()
+    text = text.lower()
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
 def compute_rule_score(text: str) -> Tuple[float, Dict[str, int]]:
     """Calcule un score base sur les patterns regex detectes."""
     matches = {}
