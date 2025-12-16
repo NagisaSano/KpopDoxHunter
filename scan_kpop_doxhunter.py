@@ -1,6 +1,8 @@
 import os
 import re
+import html
 import time
+import unicodedata
 from datetime import datetime
 from typing import Dict, Tuple
 
@@ -87,6 +89,12 @@ DOX_PATTERNS = {
         re.IGNORECASE,
     ),
 
+    # Motifs adresse internationale (numero + rue/route)
+    "adresse_numero": re.compile(
+        r"\b\d{1,4}\s+(street|st|avenue|ave|road|rd|rue|chemin|route|boulevard|blvd|apartment|apt|building)\b",
+        re.IGNORECASE,
+    ),
+
     # Indications de domicile (assoupli)
     "indication_domicile": re.compile(
         r"\b(vit|habite|lives?|house|maison|apartment|appartement|building|immeuble|fenetre|window|chez|home|residence)\b",
@@ -110,6 +118,12 @@ DOX_PATTERNS = {
         r"\b(address|adresse|location|GPS|coordinates|dox+|leak|private|residence|visit|visite)\b",
         re.IGNORECASE,
     ),
+
+    # Infos perso additionnelles
+    "infos_perso": re.compile(
+        r"\b(phone|numero|email|mail|snap|instagram|insta|kakao)\b",
+        re.IGNORECASE,
+    ),
 }
 
 
@@ -124,10 +138,12 @@ def compute_rule_score(text: str) -> Tuple[float, Dict[str, int]]:
     weights = {
         "coords_gps": 0.40,         # GPS = CRITICAL
         "adresse_coree": 0.30,      # Adresse precise
+        "adresse_numero": 0.25,     # Adresse structuree
         "dox_keywords": 0.20,       # Mots-cles dox
         "indication_domicile": 0.15,# Indication lieu
         "distance_precise": 0.10,   # Distance
         "stalking_terms": 0.10,     # Stalking
+        "infos_perso": 0.10,        # Infos personnelles
     }
 
     rule_score = 0.0
@@ -242,28 +258,30 @@ def ml_dox_hunter():
 
         for video in data["items"]:
             snippet = video.get("snippet", {})
-            title = snippet.get("title") or ""
-            description = snippet.get("description") or ""
+            raw_title = snippet.get("title") or ""
+            raw_description = snippet.get("description") or ""
             video_id = video.get("id", {}).get("videoId")
 
             if not video_id:
                 continue
 
-            text = (title + " " + description).lower()
+            title = normalize_text(raw_title)
+            description = normalize_text(raw_description)
+            text = f"{title} {description}".strip()
 
             vec = vectorizer.transform([text])
             ml_score = cosine_similarity(X_train, vec).max()
 
             rule_score, pattern_matches = compute_rule_score(text)
 
-            composite_score = 0.50 * ml_score + 0.50 * rule_score
+            composite_score = 0.40 * ml_score + 0.60 * rule_score
 
             severity = compute_severity(composite_score, rule_score)
 
             results.append(
                 {
                     "query": query,
-                    "title": title[:100],
+                    "title": raw_title[:100],
                     "video_id": video_id,
                     "ml_score": round(ml_score, 3),
                     "rule_score": round(rule_score, 3),
@@ -312,3 +330,11 @@ def ml_dox_hunter():
 
 if __name__ == "__main__":
     hits = ml_dox_hunter()
+def normalize_text(text: str) -> str:
+    """Unescape HTML, strip accents, lower, and collapse whitespace."""
+    text = html.unescape(text or "")
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode()
+    text = text.lower()
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
